@@ -279,6 +279,13 @@ kbd{
         </div>
       </div>
       <div class="group">
+        <span class="lbl">نام نت</span>
+        <div class="pills" id="noteNames">
+          <button class="pill" data-note-system="solfege" aria-pressed="true">Do Re Mi</button>
+          <button class="pill" data-note-system="letters" aria-pressed="false">A B C</button>
+        </div>
+      </div>
+      <div class="group">
         <span class="lbl">اکتاو کیبورد</span>
         <div class="stepper">
           <button id="octDown" title="اکتاو پایین‌تر (کلید ↓)">−</button>
@@ -376,7 +383,8 @@ kbd{
 
 /* ================= music theory ================= */
 var NAMES=["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
-var SOLFEGE=["دو","دو دیز","ر","ر دیز","می","فا","فا دیز","سل","سل دیز","لا","لا دیز","سی"];
+var SOLFEGE=["Do","Do#","Re","Re#","Mi","Fa","Fa#","Sol","Sol#","La","La#","Ti"];
+var NOTE_SYSTEM="solfege";
 var LET={C:0,D:1,E:2,F:3,G:4,A:5,B:6};
 function note(midi){
   var pc=((midi%12)+12)%12, oct=Math.floor(midi/12)-1, n=NAMES[pc], L=n.charAt(0);
@@ -483,7 +491,8 @@ function renderNote(n,alpha,fade){
   var labelY = p.y > 205 ? p.y-24 : p.y+28;
   var nameText=el("text",{x:0,y:labelY,"class":"note-name"+(fade?" fade":""),
     "text-anchor":"middle","dominant-baseline":"central"});
-  nameText.textContent=SOLFEGE[((n.midi%12)+12)%12];
+  var pc=((n.midi%12)+12)%12;
+  nameText.textContent=NOTE_SYSTEM==="solfege" ? SOLFEGE[pc] : NAMES[pc];
   g.appendChild(nameText);
 
   var down = p.off>=4;
@@ -494,6 +503,17 @@ function renderNote(n,alpha,fade){
     "class":"note-stem"+(fade?" fade":"")}));
   return g;
 }
+
+/* ================= note-name system ================= */
+document.querySelectorAll("#noteNames .pill").forEach(function(btn){
+  btn.addEventListener("click",function(){
+    NOTE_SYSTEM=this.getAttribute("data-note-system")||"solfege";
+    document.querySelectorAll("#noteNames .pill").forEach(function(b){
+      b.setAttribute("aria-pressed",b===btn?"true":"false");
+    });
+    renderStaff();
+  });
+});
 
 /* ================= staff note lifecycle ================= */
 var FADE=2100, SPACING=54, X0=200, XMAX=960;
