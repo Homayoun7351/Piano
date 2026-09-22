@@ -494,114 +494,223 @@ function tick(){
 function startRaf(){ if(!raf) raf=requestAnimationFrame(tick); }
 
 /* ================= audio ================= */
-var AC=null,master=null,dryG=null,wetG=null,convo=null,comp=null;
+var AC=null,master=null,wetG=null,convo=null,comp=null;
 var INST="piano", VOICES=new Map(), MAXV=16;
 var held=new Set(), sustained=new Set(), sustain=false;
 
 function makeImpulse(dur,decay){
-  var rate=AC.sampleRate, len=Math.floor(rate*dur), buf=AC.createBuffer(2,len,rate), ch,i,d;
-  for(ch=0;ch<2;ch++){
-    d=buf.getChannelData(ch);
-    for(i=0;i<len;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/len,decay);
+  var rate=AC.sampleRate, len=Math.floor(rate*dur);
+  var buf=AC.createBuffer(2,len,rate);
+  for(var ch=0;ch<2;ch++){
+    var data=buf.getChannelData(ch);
+    for(var j=0;j<len;j++){
+      data[j]=(Math.random()*2-1)*Math.pow(1-j/len,decay);
+    }
   }
   return buf;
 }
+
 function ensureAudio(){
-  if(AC){ if(AC.state==="suspended") AC.resume(); return; }
   var Ctx=window.AudioContext||window.webkitAudioContext;
-  AC=new Ctx();
-  comp=AC.createDynamicsCompressor();
-  comp.threshold.value=-11; comp.ratio.value=4; comp.attack.value=0.004; comp.release.value=0.25;
-  master=AC.createGain(); master.gain.value=0.72;
-  dryG=AC.createGain(); dryG.gain.value=1;
-  wetG=AC.createGain(); wetG.gain.value=0.17;
-  convo=AC.createConvolver(); convo.buffer=makeImpulse(2.2,2.9);
-  master.connect(comp); comp.connect(dryG); comp.connect(convo);
-  convo.connect(wetG); wetG.connect(AC.destination); dryG.connect(AC.destination);
-}
-function startVoice(midi){
-  var f=440*Math.pow(2,(midi-69)/12), t=AC.currentTime;
-  var out=AC.createGain(); out.gain.value=0, nodes=[], rel=0.3, peak=0.5, i;
-  function osc(type,mul,gain,det,type2){
-    var o=AC.createOscillator(); o.type=type; o.frequency.value=f*mul;
-    if(det) o.detune.value=det;
-    var g=AC.createGain(); g.gain.value=gain;
-    o.connect(g); g.connect(out); o.start(t); nodes.push(o); return o;
+  if(!Ctx){
+    console.error("Web Audio API is not supported by this browser.");
+    return false;
   }
-  if(INST==="piano"){
-    osc("sine",1,1); osc("sine",2,0.42); osc("sine",3,0.16); osc("sine",4,0.07); osc("triangle",1,0.18);
-    peak=0.55; rel=0.3;
-    out.gain.setValueAtTime(0,t);
-    out.gain.linearRampToValueAtTime(peak,t+0.008);
-    out.gain.exponentialRampToValueAtTime(peak*0.32,t+0.45);
-    out.gain.exponentialRampToValueAtTime(0.0008,t+2.9);
-  } else if(INST==="organ"){
-    osc("sine",1,1); osc("sine",2,0.55); osc("sine",3,0.3); osc("sine",4,0.2); osc("sine",6,0.1);
-    peak=0.4; rel=0.15;
-    out.gain.setValueAtTime(0,t);
-    out.gain.linearRampToValueAtTime(peak,t+0.035);
-    out.gain.linearRampToValueAtTime(peak*0.9,t+0.6);
-  } else if(INST==="guitar"){
-    var lp=AC.createBiquadFilter(); lp.type="lowpass";
-    lp.frequency.value=Math.min(6200,f*12+900); lp.Q.value=0.7; lp.connect(out);
-    var o1=AC.createOscillator(); o1.type="sawtooth"; o1.frequency.value=f;
-    var g1=AC.createGain(); g1.gain.value=0.7;
-    var o2=AC.createOscillator(); o2.type="triangle"; o2.frequency.value=f*2.01;
-    var g2=AC.createGain(); g2.gain.value=0.22;
-    o1.connect(g1); g1.connect(lp); o2.connect(g2); g2.connect(lp);
-    o1.start(t); o2.start(t); nodes.push(o1,o2);
-    peak=0.5; rel=0.2;
-    out.gain.setValueAtTime(0,t);
-    out.gain.linearRampToValueAtTime(peak,t+0.006);
-    out.gain.exponentialRampToValueAtTime(peak*0.22,t+0.35);
-    out.gain.exponentialRampToValueAtTime(0.0008,t+1.9);
-  } else if(INST==="strings"){
-    var lp2=AC.createBiquadFilter(); lp2.type="lowpass"; lp2.frequency.value=2400; lp2.connect(out);
-    var dets=[-7,7];
-    for(i=0;i<dets.length;i++){
-      var oo=AC.createOscillator(); oo.type="sawtooth"; oo.frequency.value=f; oo.detune.value=dets[i];
-      var gg=AC.createGain(); gg.gain.value=0.45;
-      oo.connect(gg); gg.connect(lp2); oo.start(t); nodes.push(oo);
+
+  if(!AC){
+    try{
+      AC=new Ctx();
+      comp=AC.createDynamicsCompressor();
+      comp.threshold.value=-12;
+      comp.knee.value=18;
+      comp.ratio.value=4;
+      comp.attack.value=0.003;
+      comp.release.value=0.22;
+
+      master=AC.createGain();
+      master.gain.value=0.72;
+
+      wetG=AC.createGain();
+      wetG.gain.value=0.17;
+
+      convo=AC.createConvolver();
+      convo.buffer=makeImpulse(2.0,2.7);
+
+      /* Clean main path: every voice -> master -> compressor -> speakers. */
+      master.connect(comp);
+      comp.connect(AC.destination);
+
+      /* Reverb is a parallel send, never the only audio path. */
+      comp.connect(convo);
+      convo.connect(wetG);
+      wetG.connect(AC.destination);
+
+      console.info("Audio engine initialized:", AC.sampleRate+"Hz", AC.state);
+    }catch(err){
+      console.error("Audio initialization failed:",err);
+      AC=null;
+      return false;
     }
-    peak=0.34; rel=0.6;
-    out.gain.setValueAtTime(0,t);
-    out.gain.linearRampToValueAtTime(peak,t+0.26);
-    out.gain.linearRampToValueAtTime(peak*0.85,t+2.5);
-  } else {
-    var a1=AC.createOscillator(); a1.type="sine"; a1.frequency.value=f;
-    var ag1=AC.createGain(); ag1.gain.value=0.85;
-    var a2=AC.createOscillator(); a2.type="sine"; a2.frequency.value=f*2;
-    var ag2=AC.createGain(); ag2.gain.value=0.07;
-    a1.connect(ag1); ag1.connect(out); a2.connect(ag2); ag2.connect(out);
-    a1.start(t); a2.start(t); nodes.push(a1,a2);
-    var lfo=AC.createOscillator(); lfo.type="sine"; lfo.frequency.value=5.2;
-    var lg=AC.createGain(); lg.gain.value=f*0.004;
-    lfo.connect(lg); lg.connect(a1.frequency); lfo.start(t); nodes.push(lfo);
-    peak=0.45; rel=0.28;
-    out.gain.setValueAtTime(0,t);
-    out.gain.linearRampToValueAtTime(peak,t+0.09);
-    out.gain.linearRampToValueAtTime(peak*0.9,t+1.2);
   }
+
+  if(AC.state==="suspended"){
+    var p=AC.resume();
+    if(p && p.catch) p.catch(function(err){ console.error("Audio resume failed:",err); });
+  }
+  return true;
+}
+
+function setVoiceEnvelope(gain,attack,decay,sustainLevel){
+  var t=AC.currentTime;
+  gain.gain.cancelScheduledValues(t);
+  gain.gain.setValueAtTime(0.0001,t);
+  gain.gain.linearRampToValueAtTime(1,t+attack);
+  if(decay!==null){
+    gain.gain.exponentialRampToValueAtTime(Math.max(0.0001,sustainLevel),t+decay);
+  }
+}
+
+function startVoice(midi){
+  var f=440*Math.pow(2,(midi-69)/12);
+  var t=AC.currentTime;
+  var out=AC.createGain();
+  var nodes=[];
+  var rel=0.25;
+  var peak=0.5;
+
+  function addOsc(type,freq,level,detune){
+    var osc=AC.createOscillator();
+    var gain=AC.createGain();
+    osc.type=type;
+    osc.frequency.setValueAtTime(freq,t);
+    if(detune) osc.detune.setValueAtTime(detune,t);
+    gain.gain.value=level;
+    osc.connect(gain);
+    gain.connect(out);
+    osc.start(t);
+    nodes.push(osc);
+    return osc;
+  }
+
+  if(INST==="piano"){
+    addOsc("sine",f,0.78,0);
+    addOsc("triangle",f,0.20,0);
+    addOsc("sine",f*2,0.25,0);
+    addOsc("sine",f*3,0.09,0);
+    addOsc("sine",f*4,0.035,0);
+    peak=0.58; rel=0.34;
+
+    out.gain.setValueAtTime(0.0001,t);
+    out.gain.exponentialRampToValueAtTime(peak,t+0.008);
+    out.gain.exponentialRampToValueAtTime(peak*0.36,t+0.38);
+    out.gain.exponentialRampToValueAtTime(0.0008,t+2.8);
+
+  }else if(INST==="organ"){
+    addOsc("sine",f,0.82,0);
+    addOsc("sine",f*2,0.42,0);
+    addOsc("sine",f*3,0.20,0);
+    addOsc("sine",f*4,0.12,0);
+    addOsc("sine",f*6,0.06,0);
+    peak=0.43; rel=0.12;
+
+    out.gain.setValueAtTime(0.0001,t);
+    out.gain.exponentialRampToValueAtTime(peak,t+0.025);
+    out.gain.setValueAtTime(peak*0.92,t+0.12);
+
+  }else if(INST==="guitar"){
+    var filter=AC.createBiquadFilter();
+    filter.type="lowpass";
+    filter.frequency.setValueAtTime(Math.min(7000,1800+f*8),t);
+    filter.Q.value=0.65;
+
+    var g1=AC.createGain();
+    var g2=AC.createGain();
+    var o1=AC.createOscillator();
+    var o2=AC.createOscillator();
+
+    o1.type="triangle";
+    o1.frequency.setValueAtTime(f,t);
+    g1.gain.value=0.75;
+
+    o2.type="sawtooth";
+    o2.frequency.setValueAtTime(f*2.01,t);
+    g2.gain.value=0.12;
+
+    o1.connect(g1); g1.connect(filter);
+    o2.connect(g2); g2.connect(filter);
+    filter.connect(out);
+    o1.start(t); o2.start(t);
+    nodes.push(o1,o2);
+
+    peak=0.52; rel=0.22;
+    out.gain.setValueAtTime(0.0001,t);
+    out.gain.exponentialRampToValueAtTime(peak,t+0.006);
+    out.gain.exponentialRampToValueAtTime(peak*0.18,t+0.32);
+    out.gain.exponentialRampToValueAtTime(0.0008,t+1.8);
+
+  }else if(INST==="strings"){
+    var sf=AC.createBiquadFilter();
+    sf.type="lowpass";
+    sf.frequency.setValueAtTime(3000,t);
+    sf.Q.value=0.55;
+    sf.connect(out);
+
+    addOsc("sawtooth",f,0.28,-7);
+    addOsc("sawtooth",f,0.28,7);
+    addOsc("triangle",f*2,0.045,0);
+
+    /* The helper oscillators connect to out, so strings also need their own
+       filtered pair below for a smoother result. */
+    var s1=AC.createOscillator(), s2=AC.createOscillator();
+    var sg1=AC.createGain(), sg2=AC.createGain();
+    s1.type="sawtooth"; s1.frequency.setValueAtTime(f,t); s1.detune.value=-5; sg1.gain.value=0.20;
+    s2.type="sawtooth"; s2.frequency.setValueAtTime(f,t); s2.detune.value=5; sg2.gain.value=0.20;
+    s1.connect(sg1); sg1.connect(sf); s2.connect(sg2); sg2.connect(sf);
+    s1.start(t); s2.start(t); nodes.push(s1,s2);
+
+    peak=0.34; rel=0.55;
+    out.gain.setValueAtTime(0.0001,t);
+    out.gain.linearRampToValueAtTime(peak,t+0.22);
+    out.gain.linearRampToValueAtTime(peak*0.82,t+1.4);
+
+  }else{
+    var flute=addOsc("sine",f,0.72,0);
+    addOsc("sine",f*2,0.06,0);
+    var lfo=AC.createOscillator();
+    var lfoGain=AC.createGain();
+    lfo.type="sine";
+    lfo.frequency.setValueAtTime(5.2,t);
+    lfoGain.gain.value=f*0.004;
+    lfo.connect(lfoGain);
+    lfoGain.connect(flute.frequency);
+    lfo.start(t);
+    nodes.push(lfo);
+
+    peak=0.44; rel=0.28;
+    out.gain.setValueAtTime(0.0001,t);
+    out.gain.linearRampToValueAtTime(peak,t+0.08);
+    out.gain.linearRampToValueAtTime(peak*0.88,t+0.8);
+  }
+
   out.connect(master);
   return {out:out,nodes:nodes,rel:rel};
 }
+
 function stopVoice(v){
-  var t=AC.currentTime, i;
+  if(!AC||!v) return;
+  var t=AC.currentTime;
   try{
-    if(v.out.gain.cancelAndHoldAtTime){
-      v.out.gain.cancelAndHoldAtTime(t);
-      v.out.gain.exponentialRampToValueAtTime(0.0006,t+v.rel);
-    } else {
-      var cur=Math.max(v.out.gain.value,0.0006);
-      v.out.gain.cancelScheduledValues(t);
-      v.out.gain.setValueAtTime(cur,t);
-      v.out.gain.exponentialRampToValueAtTime(0.0006,t+v.rel);
-    }
+    v.out.gain.cancelScheduledValues(t);
+    var current=Math.max(v.out.gain.value,0.0008);
+    v.out.gain.setValueAtTime(current,t);
+    v.out.gain.exponentialRampToValueAtTime(0.0006,t+v.rel);
   }catch(e){}
-  for(i=0;i<v.nodes.length;i++){
-    try{ v.nodes[i].stop(t+v.rel+0.06); }catch(e2){}
+
+  for(var i=0;i<v.nodes.length;i++){
+    try{ v.nodes[i].stop(t+v.rel+0.08); }catch(e2){}
   }
 }
+
 function killVoice(midi){
   var v=VOICES.get(midi);
   if(!v) return;
@@ -609,37 +718,54 @@ function killVoice(midi){
   stopVoice(v);
   releaseStaffNote(midi);
 }
+
 function noteOn(midi){
   if(midi<START_MIDI||midi>END_MIDI) return;
   if(held.has(midi)) return;
-  ensureAudio();
+  if(!ensureAudio()) return;
+
   held.add(midi);
+
   while(VOICES.size>=MAXV){
     var first=VOICES.keys().next().value;
+    if(first===undefined) break;
     killVoice(first);
-    held.delete(first); sustained.delete(first);
+    held.delete(first);
+    sustained.delete(first);
   }
+
   VOICES.set(midi,startVoice(midi));
   addStaffNote(midi);
   refresh();
 }
+
 function noteOff(midi){
   if(!held.has(midi)) return;
   held.delete(midi);
+
   if(sustain) sustained.add(midi);
   else killVoice(midi);
+
   refresh();
 }
+
 function setSustain(on){
   sustain=on;
   sustainBtn.setAttribute("aria-pressed",on?"true":"false");
+
   if(!on){
     var toRelease=[];
-    sustained.forEach(function(m){ if(!held.has(m)) toRelease.push(m); });
-    for(var i=0;i<toRelease.length;i++){ killVoice(toRelease[i]); sustained.delete(toRelease[i]); }
+    sustained.forEach(function(m){
+      if(!held.has(m)) toRelease.push(m);
+    });
+    for(var i=0;i<toRelease.length;i++){
+      killVoice(toRelease[i]);
+      sustained.delete(toRelease[i]);
+    }
   }
   refresh();
 }
+
 
 /* ================= keyboard geometry / DOM ================= */
 var board=document.getElementById("board");
