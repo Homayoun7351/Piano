@@ -101,6 +101,7 @@ h2{
   min-height:38px;padding:7px 13px;border-radius:11px;transition:all .18s ease;
 }
 #noteNames .pill{width:92px;text-align:center}
+.mobile-octave-scroller{display:none}
 #staffNamesBtn{white-space:nowrap}
 .pill:hover{background:rgba(242,233,220,.1)}
 .pill[aria-pressed="true"]{
@@ -251,6 +252,11 @@ kbd{
   .wrap{gap:12px}
   .plate{padding:14px 12px}
   .panel{padding:13px 11px 15px;border-radius:15px}
+  .mobile-octave-scroller{display:flex;overflow-x:auto;gap:8px;padding:2px 2px 8px;margin:0 0 4px;scroll-snap-type:x mandatory;scrollbar-width:thin;direction:ltr;-webkit-overflow-scrolling:touch}
+  .mobile-octave-scroller::-webkit-scrollbar{height:5px}
+  .mobile-octave-scroller::-webkit-scrollbar-thumb{background:rgba(201,161,90,.55);border-radius:99px}
+  .mobile-octave-btn{flex:0 0 31%;min-width:112px;min-height:42px;padding:7px 10px;border-radius:11px;border:1px solid var(--line-strong);background:rgba(242,233,220,.045);color:var(--muted);font:inherit;font-size:.82em;cursor:pointer;scroll-snap-align:center;direction:ltr;white-space:nowrap}
+  .mobile-octave-btn[aria-selected="true"]{background:linear-gradient(180deg,rgba(230,196,137,.28),rgba(201,161,90,.16));border-color:rgba(201,161,90,.68);color:var(--brass-hi);box-shadow:0 0 0 1px rgba(201,161,90,.16)}
   .board-wrap{overflow:hidden;border-radius:0 0 10px 10px;width:100%;margin:0 auto}
   .board{height:182px;min-width:0;width:100%}
   .controls{gap:12px}
@@ -371,6 +377,11 @@ kbd{
     <div class="panel-head">
       <h2>کیبورد</h2>
       <span class="head-note">روی کلیدها بکشید تا گلیساندو شود · چند نت با هم = چندصدایی</span>
+    </div>
+    <div class="mobile-octave-scroller" id="mobileOctaveScroller" aria-label="انتخاب اکتاو">
+      <button class="mobile-octave-btn" data-octave="2" aria-selected="false">C2 – C3</button>
+      <button class="mobile-octave-btn" data-octave="3" aria-selected="true">C3 – C4</button>
+      <button class="mobile-octave-btn" data-octave="4" aria-selected="false">C4 – C5</button>
     </div>
     <div class="felt"></div>
     <div class="board-wrap"><div class="board" id="board"></div></div>
@@ -901,8 +912,8 @@ function keyEl(midi,isWhite){
 function renderKeyboardGeometry(){
   mobileKeyboard=window.matchMedia("(max-width:760px)").matches;
   whiteMidis=[]; keyEls={}; board.innerHTML="";
-  var from=mobileKeyboard?48:START_MIDI;
-  var to=mobileKeyboard?60:END_MIDI;
+  var from=mobileKeyboard?(baseOct*12+24):START_MIDI;
+  var to=mobileKeyboard?(baseOct*12+36):END_MIDI;
   for(var mm=from;mm<=to;mm++) if(WHITE_PC[((mm%12)+12)%12]) whiteMidis.push(mm);
   var whiteW=100/whiteMidis.length;
   for(var wi=0;wi<whiteMidis.length;wi++){
@@ -928,6 +939,7 @@ window.addEventListener("resize",function(){
     renderKeyboardGeometry();
     buildMap();
     refresh();
+    syncMobileOctaveScroller();
   }
 });
 
@@ -943,7 +955,7 @@ var R2BO=[1,3,6,8,10,13,15];
 var LABEL={KeyZ:"Z",KeyX:"X",KeyC:"C",KeyV:"V",KeyB:"B",KeyN:"N",KeyM:"M",
   Comma:",",Period:".",Slash:"/",KeyS:"S",KeyD:"D",KeyG:"G",KeyH:"H",KeyJ:"J",KeyL:"L",
   Semicolon:";",KeyQ:"Q",KeyW:"W",KeyE:"E",KeyR:"R",KeyT:"T",KeyY:"Y",KeyU:"U",KeyI:"I",
-  KeyO:"O",KeyP:"P",Digit2:"2",Digit3:"3",Digit5:"5",Digit6:"6",Digit7:"7",Digit9:"9",Digit0:"0"};
+  KeyO:"O",KeyP:"P",Digit2:"",Digit3:"",Digit5:"",Digit6:"",Digit7:"",Digit9:"",Digit0:""};
 
 var baseOct=3, codeMap={}, codeMidi={};
 function buildMap(){
@@ -971,7 +983,6 @@ function buildMap(){
 /* ================= state refresh ================= */
 var nowPlaying=document.getElementById("nowPlaying");
 var liveDot=document.getElementById("liveDot");
-var metaVoices=document.getElementById("metaVoices");
 function refresh(){
   var lit={}, arr=[], i2;
   held.forEach(function(x){ lit[x]=1; });
@@ -986,7 +997,6 @@ function refresh(){
   for(i2=0;i2<arr.length;i2++) names.push(note(arr[i2]).name);
   nowPlaying.textContent=names.length?names.join(" · "):"—";
   liveDot.classList.toggle("live",names.length>0);
-  metaVoices.textContent=VOICES.size+" صدا در حال پخش";
   board.classList.toggle("has-sustain",sustain);
   updateStatusUI();
 }
@@ -1058,9 +1068,42 @@ function shiftOct(d){
   held.forEach(function(x){ all.push(x); });
   for(var i3=0;i3<all.length;i3++) noteOff(all[i3]);
   baseOct=n;
+  renderKeyboardGeometry();
   buildMap();
   refresh();
+  syncMobileOctaveScroller();
 }
+
+/* ================= mobile octave scroller ================= */
+var mobileOctaveScroller=document.getElementById("mobileOctaveScroller");
+function syncMobileOctaveScroller(){
+  if(!mobileOctaveScroller) return;
+  var buttons=mobileOctaveScroller.querySelectorAll(".mobile-octave-btn");
+  for(var oi=0;oi<buttons.length;oi++){
+    var active=parseInt(buttons[oi].getAttribute("data-octave"),10)===baseOct;
+    buttons[oi].setAttribute("aria-selected",active?"true":"false");
+    if(active && mobileKeyboard){
+      try{ buttons[oi].scrollIntoView({behavior:"smooth",block:"nearest",inline:"center"}); }catch(e){}
+    }
+  }
+}
+if(mobileOctaveScroller){
+  mobileOctaveScroller.addEventListener("click",function(e){
+    var btn=e.target.closest(".mobile-octave-btn");
+    if(!btn) return;
+    var n=parseInt(btn.getAttribute("data-octave"),10);
+    if(!isFinite(n)||n<2||n>4||n===baseOct) return;
+    var all=[];
+    held.forEach(function(x){all.push(x);});
+    for(var oi=0;oi<all.length;oi++) noteOff(all[oi]);
+    baseOct=n;
+    renderKeyboardGeometry();
+    buildMap();
+    refresh();
+    syncMobileOctaveScroller();
+  });
+}
+syncMobileOctaveScroller();
 
 /* ================= controls ================= */
 var instBox=document.getElementById("instruments");
