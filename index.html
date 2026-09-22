@@ -95,7 +95,7 @@ h2{
 }
 .pills{display:flex;gap:7px;flex-wrap:wrap}
 .pill{
-  font:inherit;font-size:.84em;cursor:pointer;color:var(--ink);
+  font:inherit;font-size:.84em;cursor:pointer;touch-action:manipulation;color:var(--ink);
   background:linear-gradient(180deg,rgba(242,233,220,.065),rgba(242,233,220,.035));
   border:1px solid var(--line-strong);
   min-height:38px;padding:7px 13px;border-radius:11px;transition:all .18s ease;
@@ -1088,25 +1088,29 @@ syncMobileOctaveScroller();
 
 /* ================= controls ================= */
 var instBox=document.getElementById("instruments");
-instBox.addEventListener("click",function(e){
-  var b=e.target.closest(".pill");
-  if(!b || !instBox.contains(b)) return;
-  e.preventDefault();
 
-  /* Select the new instrument first so every newly created voice uses it. */
-  INST=b.getAttribute("data-inst")||"piano";
+function selectInstrument(b){
+  if(!b || !instBox.contains(b)) return;
+  var nextInst=b.getAttribute("data-inst")||"piano";
+  if(!nextInst) return;
+
+  /* Set the instrument before releasing voices so the next note is guaranteed
+     to enter the selected instrument branch, including on touch devices. */
+  INST=nextInst;
+
   Array.prototype.forEach.call(instBox.querySelectorAll(".pill"),function(p){
     p.setAttribute("aria-pressed",p===b?"true":"false");
   });
 
-  /* Mobile browsers can keep a previous touch/audio voice alive briefly.
-     Stop every active voice and clear all key state before the next note. */
   ensureAudio();
+
+  /* Stop every currently sounding voice. */
   var all=[];
   held.forEach(function(x){ all.push(x); });
   for(var i4=0;i4<all.length;i4++) noteOff(all[i4]);
   sustained.clear();
   codeMidi={};
+
   VOICES.forEach(function(v){ stopVoice(v); });
   VOICES.clear();
 
@@ -1116,6 +1120,22 @@ instBox.addEventListener("click",function(e){
   renderStaff();
   startRaf();
   refresh();
+}
+
+/* pointerup is used for touch/mobile explicitly; click remains as a keyboard
+   fallback (detail===0) so mouse and keyboard activation also work. */
+instBox.addEventListener("pointerup",function(e){
+  var b=e.target.closest(".pill");
+  if(!b || !instBox.contains(b)) return;
+  e.preventDefault();
+  selectInstrument(b);
+});
+instBox.addEventListener("click",function(e){
+  if(e.detail!==0) return;
+  var b=e.target.closest(".pill");
+  if(!b || !instBox.contains(b)) return;
+  e.preventDefault();
+  selectInstrument(b);
 });
 var vol=document.getElementById("vol");
 var volVal=document.getElementById("volVal");
