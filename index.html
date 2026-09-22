@@ -1090,19 +1090,31 @@ syncMobileOctaveScroller();
 var instBox=document.getElementById("instruments");
 instBox.addEventListener("click",function(e){
   var b=e.target.closest(".pill");
-  if(!b) return;
+  if(!b || !instBox.contains(b)) return;
+  e.preventDefault();
+
+  /* Select the new instrument first so every newly created voice uses it. */
+  INST=b.getAttribute("data-inst")||"piano";
   Array.prototype.forEach.call(instBox.querySelectorAll(".pill"),function(p){
     p.setAttribute("aria-pressed",p===b?"true":"false");
   });
-  /* release held notes so the new instrument starts clean */
+
+  /* Mobile browsers can keep a previous touch/audio voice alive briefly.
+     Stop every active voice and clear all key state before the next note. */
+  ensureAudio();
   var all=[];
   held.forEach(function(x){ all.push(x); });
-  for(var i4=0;i4<all.length;i4++) held.delete(all[i4]);
+  for(var i4=0;i4<all.length;i4++) noteOff(all[i4]);
+  sustained.clear();
+  codeMidi={};
   VOICES.forEach(function(v){ stopVoice(v); });
   VOICES.clear();
-  staffNotes.forEach(function(n){ if(n.held){ n.held=false; n.releasedAt=performance.now(); } });
-  renderStaff(); startRaf();
-  INST=b.dataset.inst;
+
+  staffNotes.forEach(function(n){
+    if(n.held){ n.held=false; n.releasedAt=performance.now(); }
+  });
+  renderStaff();
+  startRaf();
   refresh();
 });
 var vol=document.getElementById("vol");
