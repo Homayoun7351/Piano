@@ -673,7 +673,8 @@ function setVoiceEnvelope(gain,attack,decay,sustainLevel){
   }
 }
 
-function startVoice(midi){
+function startVoice(midi,instrument){
+  instrument=instrument||INST;
   var f=440*Math.pow(2,(midi-69)/12);
   var t=AC.currentTime;
   var out=AC.createGain();
@@ -695,7 +696,7 @@ function startVoice(midi){
     return osc;
   }
 
-  if(INST==="piano"){
+  if(instrument==="piano"){
     addOsc("sine",f,0.78,0);
     addOsc("triangle",f,0.20,0);
     addOsc("sine",f*2,0.25,0);
@@ -708,7 +709,7 @@ function startVoice(midi){
     out.gain.exponentialRampToValueAtTime(peak*0.36,t+0.38);
     out.gain.exponentialRampToValueAtTime(0.0008,t+2.8);
 
-  }else if(INST==="organ"){
+  }else if(instrument==="organ"){
     addOsc("sine",f,0.82,0);
     addOsc("sine",f*2,0.42,0);
     addOsc("sine",f*3,0.20,0);
@@ -720,7 +721,7 @@ function startVoice(midi){
     out.gain.exponentialRampToValueAtTime(peak,t+0.025);
     out.gain.setValueAtTime(peak*0.92,t+0.12);
 
-  }else if(INST==="guitar"){
+  }else if(instrument==="guitar"){
     var filter=AC.createBiquadFilter();
     filter.type="lowpass";
     filter.frequency.setValueAtTime(Math.min(7000,1800+f*8),t);
@@ -751,7 +752,7 @@ function startVoice(midi){
     out.gain.exponentialRampToValueAtTime(peak*0.18,t+0.32);
     out.gain.exponentialRampToValueAtTime(0.0008,t+1.8);
 
-  }else if(INST==="strings"){
+  }else if(instrument==="strings"){
     var sf=AC.createBiquadFilter();
     sf.type="lowpass";
     sf.frequency.setValueAtTime(3000,t);
@@ -833,7 +834,8 @@ function noteOn(midi){
     sustained.delete(first);
   }
 
-  VOICES.set(midi,startVoice(midi));
+  var voiceInstrument=INST;
+  VOICES.set(midi,startVoice(midi,voiceInstrument));
   addStaffNote(midi);
   refresh();
 }
