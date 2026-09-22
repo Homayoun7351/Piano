@@ -121,6 +121,30 @@ input[type="range"]::-moz-range-track{height:4px;border-radius:2px;background:rg
 input[type="range"]::-moz-range-thumb{width:16px;height:16px;border:0;border-radius:50%;background:var(--brass-hi)}
 :focus-visible{outline:2px solid var(--brass-hi);outline-offset:2px;border-radius:8px}
 
+/* ---------- transport ---------- */
+.transport{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
+.transport-btn{
+  font:inherit;font-size:.84em;cursor:pointer;color:var(--ink);
+  background:rgba(242,233,220,.05);border:1px solid var(--line-strong);
+  padding:7px 13px;border-radius:9px;transition:all .18s ease;
+}
+.transport-btn:hover{background:rgba(242,233,220,.1);border-color:rgba(201,161,90,.45)}
+.transport-btn.primary{background:linear-gradient(180deg,rgba(201,161,90,.30),rgba(201,161,90,.13));border-color:rgba(201,161,90,.58);color:var(--brass-hi)}
+.transport-btn.danger[aria-pressed="true"]{background:rgba(158,59,43,.32);border-color:rgba(192,74,52,.7)}
+.transport-btn:disabled{opacity:.35;cursor:not-allowed}
+.transport-status{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:.8em;margin-inline-start:auto}
+.transport-status b{font-family:"JetBrains Mono",monospace;color:var(--brass-hi);font-weight:600}
+.rec-dot{width:8px;height:8px;border-radius:50%;background:#6d6256}
+.rec-dot.on{background:#c04a34;box-shadow:0 0 0 5px rgba(192,74,52,.13);animation:pulse 1s ease-in-out infinite}
+.transport-sep{width:1px;height:24px;background:var(--line-strong);margin:0 2px}
+
+/* ---------- status ---------- */
+.status-strip{display:flex;align-items:center;gap:12px;flex-wrap:wrap;color:var(--muted);font-size:.78em}
+.status-item{display:inline-flex;align-items:center;gap:6px}
+.status-item strong{color:var(--ink);font-family:"JetBrains Mono",monospace;font-weight:600}
+.status-led{width:7px;height:7px;border-radius:50%;background:#655b50}
+.status-led.on{background:#7dbb72;box-shadow:0 0 9px rgba(125,187,114,.65)}
+
 /* ---------- staff ---------- */
 .staff-svg{width:100%;height:auto;display:block;direction:ltr}
 .staff-bg{fill:rgba(247,241,230,.018)}
@@ -200,8 +224,18 @@ kbd{
 }
 .foot{color:var(--muted);font-size:.8em;text-align:center;font-weight:300}
 @media (max-width:760px){
-  .board{height:150px}
+  .board-wrap{overflow-x:auto;overflow-y:hidden;border-radius:0 0 10px 10px;-webkit-overflow-scrolling:touch}
+  .board{height:170px;min-width:920px}
   .plate-meta{display:none}
+  .controls{gap:14px}
+  .group{min-width:calc(50% - 8px)}
+}
+@media (max-width:480px){
+  .group{min-width:100%}
+  .panel{padding:14px}
+  body{padding:12px 9px 28px}
+  .brand{gap:11px}
+  .mark{width:44px;height:44px;flex-basis:44px}
 }
 @media (prefers-reduced-motion:reduce){
   *{animation:none!important;transition:none!important}
@@ -252,7 +286,10 @@ kbd{
       </div>
       <div class="group">
         <span class="lbl">بلندی صدا</span>
-        <input type="range" id="vol" min="0" max="100" value="72" aria-label="بلندی صدا">
+        <div style="display:flex;align-items:center;gap:8px">
+          <input type="range" id="vol" min="0" max="100" value="72" aria-label="بلندی صدا">
+          <span id="volVal" style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--brass-hi);min-width:34px;direction:ltr">72%</span>
+        </div>
       </div>
       <div class="group">
         <span class="lbl">پدال و نما</span>
@@ -260,8 +297,20 @@ kbd{
           <button class="pill" id="sustainBtn" aria-pressed="false">پدال نگه‌دار <kbd>Shift</kbd></button>
           <button class="pill" id="reverbBtn" aria-pressed="true">فضا</button>
           <button class="pill" id="hintBtn" aria-pressed="true">حروف روی کلیدها</button>
+          <button class="pill" id="muteBtn" aria-pressed="false">🔊 صدا</button>
         </div>
       </div>
+    </div>
+    <div class="transport" aria-label="ضبط و پخش">
+      <button class="transport-btn primary" id="recordBtn" aria-pressed="false">● ضبط</button>
+      <button class="transport-btn" id="stopBtn" disabled>■ توقف</button>
+      <button class="transport-btn" id="playBtn" disabled>▶ پخش</button>
+      <button class="transport-btn" id="clearRecBtn" disabled>پاک‌کردن اجرا</button>
+      <span class="transport-sep"></span>
+      <button class="transport-btn" id="saveBtn" disabled>ذخیره اجرا</button>
+      <button class="transport-btn" id="loadBtn">بازکردن اجرا</button>
+      <input id="loadFile" type="file" accept=".json,.rplay" hidden>
+      <span class="transport-status"><span class="rec-dot" id="recDot"></span><span id="recStatus">آماده</span><b id="recTime">00:00.0</b></span>
     </div>
   </section>
 
@@ -269,7 +318,8 @@ kbd{
     <div class="panel-head">
       <h2>خطوط حامل</h2>
       <span class="head-note">نت‌هایی که می‌نوازید این‌جا نقش می‌بندند و پس از رها کردن کم‌رنگ می‌شوند</span>
-      <span class="now" style="margin-inline-start:auto"><span class="dot" id="liveDot"></span><span id="nowPlaying">—</span></span>
+      <button class="transport-btn" id="clearStaffBtn" style="margin-inline-start:auto">پاک‌کردن نت‌ها</button>
+      <span class="now"><span class="dot" id="liveDot"></span><span id="nowPlaying">—</span></span>
     </div>
     <svg class="staff-svg" viewBox="0 0 1000 258" role="img" aria-label="خطوط حامل و نت‌های نواخته‌شده">
       <defs>
@@ -283,6 +333,12 @@ kbd{
       <g id="staffNotes"></g>
       <text class="staff-hint" id="staffHint" x="640" y="140" text-anchor="middle">یک کلید بزنید…</text>
     </svg>
+    <div class="status-strip" style="margin-top:10px">
+      <span class="status-item"><span class="status-led" id="audioLed"></span>موتور صدا <strong id="audioStatus">آماده</strong></span>
+      <span class="status-item">نت‌های حامل <strong id="noteCount">0</strong></span>
+      <span class="status-item">پلی‌فونی <strong id="voiceCount">0/16</strong></span>
+      <span class="status-item">اکتاو <strong id="rangeStatus">C2–C6</strong></span>
+    </div>
   </section>
 
   <section class="panel">
@@ -291,7 +347,7 @@ kbd{
       <span class="head-note">روی کلیدها بکشید تا گلیساندو شود · چند نت با هم = چندصدایی</span>
     </div>
     <div class="felt"></div>
-    <div class="board" id="board"></div>
+    <div class="board-wrap"><div class="board" id="board"></div></div>
 
     <div class="legend">
       <div>
@@ -497,6 +553,9 @@ function startRaf(){ if(!raf) raf=requestAnimationFrame(tick); }
 var AC=null,master=null,wetG=null,convo=null,comp=null;
 var INST="piano", VOICES=new Map(), MAXV=16;
 var held=new Set(), sustained=new Set(), sustain=false;
+var muted=false;
+var recording=false, recordStart=0, recordEvents=[], playbackTimer=null, playbackActive=false, suppressRecord=false;
+var recordElapsedTimer=null;
 
 function makeImpulse(dur,decay){
   var rate=AC.sampleRate, len=Math.floor(rate*dur);
@@ -546,6 +605,10 @@ function ensureAudio(){
       wetG.connect(AC.destination);
 
       console.info("Audio engine initialized:", AC.sampleRate+"Hz", AC.state);
+      var audioLed=document.getElementById("audioLed");
+      var audioStatus=document.getElementById("audioStatus");
+      if(audioLed) audioLed.classList.add("on");
+      if(audioStatus) audioStatus.textContent="فعال";
     }catch(err){
       console.error("Audio initialization failed:",err);
       AC=null;
@@ -655,12 +718,7 @@ function startVoice(midi){
     sf.Q.value=0.55;
     sf.connect(out);
 
-    addOsc("sawtooth",f,0.28,-7);
-    addOsc("sawtooth",f,0.28,7);
-    addOsc("triangle",f*2,0.045,0);
-
-    /* The helper oscillators connect to out, so strings also need their own
-       filtered pair below for a smoother result. */
+    /* Two slightly detuned filtered saws create a smoother string ensemble. */
     var s1=AC.createOscillator(), s2=AC.createOscillator();
     var sg1=AC.createGain(), sg2=AC.createGain();
     s1.type="sawtooth"; s1.frequency.setValueAtTime(f,t); s1.detune.value=-5; sg1.gain.value=0.20;
@@ -725,6 +783,7 @@ function noteOn(midi){
   if(!ensureAudio()) return;
 
   held.add(midi);
+  if(recording && !suppressRecord) captureRecordEvent("on",midi);
 
   while(VOICES.size>=MAXV){
     var first=VOICES.keys().next().value;
@@ -742,6 +801,7 @@ function noteOn(midi){
 function noteOff(midi){
   if(!held.has(midi)) return;
   held.delete(midi);
+  if(recording && !suppressRecord) captureRecordEvent("off",midi);
 
   if(sustain) sustained.add(midi);
   else killVoice(midi);
@@ -862,6 +922,7 @@ function refresh(){
   liveDot.classList.toggle("live",names.length>0);
   metaVoices.textContent=VOICES.size+" صدا در حال پخش";
   board.classList.toggle("has-sustain",sustain);
+  updateStatusUI();
 }
 
 /* ================= pointer input ================= */
@@ -955,10 +1016,19 @@ instBox.addEventListener("click",function(e){
   refresh();
 });
 var vol=document.getElementById("vol");
+var volVal=document.getElementById("volVal");
 vol.addEventListener("input",function(){
+  var raw=parseInt(vol.value,10);
+  if(volVal) volVal.textContent=raw+"%";
   if(!master) return;
-  var v=parseInt(vol.value,10)/100;
-  master.gain.value=Math.pow(v,1.5)*1.05;
+  master.gain.value=muted?0:Math.pow(raw/100,1.5)*1.05;
+});
+var muteBtn=document.getElementById("muteBtn");
+muteBtn.addEventListener("click",function(){
+  muted=!muted;
+  if(master) master.gain.value=muted?0:Math.pow(parseInt(vol.value,10)/100,1.5)*1.05;
+  muteBtn.setAttribute("aria-pressed",muted?"true":"false");
+  muteBtn.textContent=muted?"🔇 بی‌صدا":"🔊 صدا";
 });
 var sustainBtn=document.getElementById("sustainBtn");
 sustainBtn.addEventListener("click",function(){ setSustain(!sustain); });
@@ -978,12 +1048,163 @@ document.getElementById("octUp").addEventListener("click",function(){ shiftOct(1
 document.getElementById("octDown").addEventListener("click",function(){ shiftOct(-1); });
 window.addEventListener("keydown",function(){ ensureAudio(); },{once:false});
 
+/* ================= recording / persistence ================= */
+function captureRecordEvent(type,midi){
+  if(!recording || suppressRecord) return;
+  recordEvents.push({type:type,midi:midi,t:Math.max(0,performance.now()-recordStart)});
+  updateRecordUI();
+}
+function formatMs(ms){
+  var sec=ms/1000;
+  var m=Math.floor(sec/60);
+  var s=sec-m*60;
+  return String(m).padStart(2,"0")+":"+s.toFixed(1).padStart(4,"0");
+}
+function updateRecordUI(){
+  var elapsed=recording?performance.now()-recordStart:(recordEvents.length?recordEvents[recordEvents.length-1].t:0);
+  var recTime=document.getElementById("recTime");
+  var recStatus=document.getElementById("recStatus");
+  var recDot=document.getElementById("recDot");
+  var recordBtn=document.getElementById("recordBtn");
+  var stopBtn=document.getElementById("stopBtn");
+  var playBtn=document.getElementById("playBtn");
+  var clearBtn=document.getElementById("clearRecBtn");
+  var saveBtn=document.getElementById("saveBtn");
+  if(recTime) recTime.textContent=formatMs(elapsed);
+  if(recStatus) recStatus.textContent=recording?"در حال ضبط":(playbackActive?"در حال پخش":(recordEvents.length?"اجرا آماده است":"آماده"));
+  if(recDot) recDot.classList.toggle("on",recording);
+  if(recordBtn) recordBtn.setAttribute("aria-pressed",recording?"true":"false");
+  if(stopBtn) stopBtn.disabled=!(recording||playbackActive);
+  if(playBtn) playBtn.disabled=recording||playbackActive||!recordEvents.length;
+  if(clearBtn) clearBtn.disabled=recording||playbackActive||!recordEvents.length;
+  if(saveBtn) saveBtn.disabled=recording||playbackActive||!recordEvents.length;
+}
+function startRecording(){
+  stopPlayback();
+  recordEvents=[];
+  recording=true;
+  recordStart=performance.now();
+  if(recordElapsedTimer) cancelAnimationFrame(recordElapsedTimer);
+  function loop(){
+    updateRecordUI();
+    if(recording) recordElapsedTimer=requestAnimationFrame(loop);
+  }
+  recordElapsedTimer=requestAnimationFrame(loop);
+  updateRecordUI();
+}
+function stopRecording(){
+  if(!recording) return;
+  recording=false;
+  if(recordElapsedTimer) cancelAnimationFrame(recordElapsedTimer);
+  updateRecordUI();
+}
+function stopPlayback(){
+  if(playbackTimer){ clearTimeout(playbackTimer); playbackTimer=null; }
+  playbackActive=false;
+  suppressRecord=true;
+  var all=[]; held.forEach(function(x){all.push(x);});
+  for(var i=0;i<all.length;i++) noteOff(all[i]);
+  suppressRecord=false;
+  updateRecordUI();
+}
+function playRecording(){
+  if(!recordEvents.length || recording) return;
+  stopPlayback();
+  playbackActive=true;
+  var started=performance.now();
+  var idx=0;
+  function step(){
+    if(!playbackActive || idx>=recordEvents.length){ playbackActive=false; updateRecordUI(); return; }
+    var ev=recordEvents[idx++];
+    var delay=Math.max(0,ev.t-(performance.now()-started));
+    playbackTimer=setTimeout(function(){
+      if(ev.type==="on"){ suppressRecord=true; noteOn(ev.midi); suppressRecord=false; }
+      else { suppressRecord=true; noteOff(ev.midi); suppressRecord=false; }
+      step();
+    },delay);
+  }
+  updateRecordUI();
+  step();
+}
+function clearRecording(){
+  stopPlayback();
+  recordEvents=[];
+  updateRecordUI();
+}
+function saveRecording(){
+  if(!recordEvents.length) return;
+  var payload={
+    app:"RadioPod Piano",
+    version:2,
+    createdAt:new Date().toISOString(),
+    instrument:INST,
+    octave:baseOct,
+    events:recordEvents
+  };
+  var blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"});
+  var a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download="piano-performance-"+new Date().toISOString().slice(0,10)+".rplay.json";
+  a.click();
+  setTimeout(function(){URL.revokeObjectURL(a.href);},1000);
+}
+function loadRecordingFile(file){
+  var reader=new FileReader();
+  reader.onload=function(){
+    try{
+      var data=JSON.parse(reader.result);
+      if(!data || !Array.isArray(data.events)) throw new Error("invalid");
+      stopPlayback();
+      stopRecording();
+      recordEvents=data.events.filter(function(e){
+        return e && (e.type==="on"||e.type==="off") && Number.isFinite(e.midi) && Number.isFinite(e.t);
+      });
+      updateRecordUI();
+    }catch(err){
+      alert("فایل اجرا معتبر نیست.");
+    }
+  };
+  reader.readAsText(file);
+}
+document.getElementById("recordBtn").addEventListener("click",function(){
+  if(recording) stopRecording(); else startRecording();
+});
+document.getElementById("stopBtn").addEventListener("click",function(){
+  if(recording) stopRecording(); else stopPlayback();
+});
+document.getElementById("playBtn").addEventListener("click",playRecording);
+document.getElementById("clearRecBtn").addEventListener("click",clearRecording);
+document.getElementById("saveBtn").addEventListener("click",saveRecording);
+document.getElementById("loadBtn").addEventListener("click",function(){document.getElementById("loadFile").click();});
+document.getElementById("loadFile").addEventListener("change",function(){
+  if(this.files&&this.files[0]) loadRecordingFile(this.files[0]);
+  this.value="";
+});
+
+document.getElementById("clearStaffBtn").addEventListener("click",function(){
+  staffNotes=[];
+  notesG.innerHTML="";
+  staffHint.style.display="";
+  updateStatusUI();
+});
+
+function updateStatusUI(){
+  var count=document.getElementById("noteCount");
+  var vc=document.getElementById("voiceCount");
+  var rs=document.getElementById("rangeStatus");
+  if(count) count.textContent=staffNotes.length;
+  if(vc) vc.textContent=VOICES.size+"/"+MAXV;
+  if(rs) rs.textContent="C"+(baseOct-1)+"–C"+(baseOct+3);
+}
+ 
 /* ================= boot ================= */
 drawBase();
 document.body.classList.add("show-hints");
 buildMap();
 renderStaff();
 refresh();
+updateRecordUI();
+if(volVal) volVal.textContent=vol.value+"%";
 if(document.fonts&&document.fonts.ready) document.fonts.ready.then(fitClefs);
 window.addEventListener("resize",fitClefs);
 })();
