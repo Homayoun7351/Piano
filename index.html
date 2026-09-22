@@ -912,8 +912,8 @@ function keyEl(midi,isWhite){
 function renderKeyboardGeometry(){
   mobileKeyboard=window.matchMedia("(max-width:760px)").matches;
   whiteMidis=[]; keyEls={}; board.innerHTML="";
-  var from=mobileKeyboard?(baseOct*12+24):START_MIDI;
-  var to=mobileKeyboard?(baseOct*12+36):END_MIDI;
+  var from=mobileKeyboard?(baseOct*12+12):START_MIDI;
+  var to=mobileKeyboard?(baseOct*12+24):END_MIDI;
   for(var mm=from;mm<=to;mm++) if(WHITE_PC[((mm%12)+12)%12]) whiteMidis.push(mm);
   var whiteW=100/whiteMidis.length;
   for(var wi=0;wi<whiteMidis.length;wi++){
