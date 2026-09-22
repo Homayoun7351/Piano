@@ -263,10 +263,7 @@ kbd{
   .group{min-width:calc(50% - 6px)}
   .panel-head{gap:8px}
   .head-note{font-size:.74em}
-  .panel:has(.staff-svg){overflow:hidden}
-  .staff-svg{width:120%;max-width:none;margin-inline-start:-10%;margin-inline-end:-10%}
-  .staff-line{stroke-width:1.35}
-  .note-head{transform-box:fill-box}
+  .staff-svg{width:100%;max-width:680px}
 }
 @media (max-width:480px){
   .group{min-width:100%}
@@ -275,8 +272,7 @@ kbd{
   .mark{width:42px;height:42px;flex-basis:42px;border-radius:12px}
   .sub{font-size:.76em}
   #noteNames .pill{width:100px}
-  .staff-svg{width:135%;max-width:none;margin-inline-start:-17.5%;margin-inline-end:-17.5%}
-  .note-name{font-size:17px}
+  .staff-svg{max-width:100%}
 }
 @media (prefers-reduced-motion:reduce){
   *{animation:none!important;transition:none!important}
