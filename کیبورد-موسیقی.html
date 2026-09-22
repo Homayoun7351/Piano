@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>کیبورد موسیقی — چهار اکتاو</title>
+<title>آموزش نت خوانی</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Music&family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Sora:wght@300;400;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
@@ -156,6 +156,8 @@ input[type="range"]::-moz-range-thumb{width:16px;height:16px;border:0;border-rad
 .note-head.fade{fill:var(--ink)}
 .note-stem{stroke:var(--brass-hi);stroke-width:2.1;stroke-linecap:round}
 .note-stem.fade{stroke:var(--ink)}
+.note-name{fill:var(--brass-hi);font-family:"Sora","Hiragino Sans","Noto Sans Arabic",sans-serif;font-size:15px;font-weight:600}
+.note-name.fade{fill:var(--ink)}
 .acc{fill:var(--brass-hi);font-family:"Noto Music",serif}
 .acc.fade{fill:var(--ink)}
 .staff-hint{fill:rgba(242,233,220,.28);font-size:19px;font-family:"Sora",sans-serif}
@@ -253,8 +255,8 @@ kbd{
     <div class="brand">
       <div class="mark">&#119070;</div>
       <div>
-        <h1>کیبورد موسیقی</h1>
-        <p class="sub">چهار اکتاو · چندصدایی · نقشِ نت روی خطوط حامل — با ماوس و کیبورد لپ‌تاپ</p>
+        <h1>آموزش نت خوانی</h1>
+        <p class="sub">تهیه شده توسط Homayoun7351 با کمک Chat GPT</p>
       </div>
     </div>
     <div class="plate-meta">
@@ -374,6 +376,7 @@ kbd{
 
 /* ================= music theory ================= */
 var NAMES=["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+var SOLFEGE=["دو","دو دیز","ر","ر دیز","می","فا","فا دیز","سل","سل دیز","لا","لا دیز","سی"];
 var LET={C:0,D:1,E:2,F:3,G:4,A:5,B:6};
 function note(midi){
   var pc=((midi%12)+12)%12, oct=Math.floor(midi/12)-1, n=NAMES[pc], L=n.charAt(0);
@@ -475,6 +478,14 @@ function renderNote(n,alpha,fade){
   var head=el("ellipse",{cx:0,cy:p.y,rx:HEAD_RX,ry:HEAD_RY,"class":"note-head"+(fade?" fade":""),
     transform:"rotate(-18 0 "+p.y.toFixed(1)+")"});
   g.appendChild(head);
+
+  /* Persian solfege name next to every note. */
+  var labelY = p.y > 205 ? p.y-24 : p.y+28;
+  var nameText=el("text",{x:0,y:labelY,"class":"note-name"+(fade?" fade":""),
+    "text-anchor":"middle","dominant-baseline":"central"});
+  nameText.textContent=SOLFEGE[((n.midi%12)+12)%12];
+  g.appendChild(nameText);
+
   var down = p.off>=4;
   var sx = down? -(HEAD_RX-1.4) : (HEAD_RX-1.4);
   var y1 = down? p.y+HEAD_RY*0.85 : p.y-HEAD_RY*0.85;
