@@ -458,7 +458,7 @@ var staffHint=document.getElementById("staffHint");
 
 function drawBase(){
   baseG.innerHTML="";
-  var startX=52, endX=988, i, y;
+  var startX=staffMobile?120:52, endX=staffMobile?880:988, i, y;
   for(i=0;i<5;i++){
     y=TREBLE_TOP+i*S;
     baseG.appendChild(el("line",{x1:startX,y1:y,x2:endX,y2:y,"class":"staff-line"}));
@@ -503,7 +503,7 @@ function fitClefs(){
   tF.setAttribute("y",(topY2+asc2).toFixed(1));
 }
 
-var HEAD_RX=8.2, HEAD_RY=6.0, STEM_LEN=49;
+var HEAD_RX=staffMobile?11:8.2, HEAD_RY=staffMobile?8:6.0, STEM_LEN=staffMobile?58:49;
 function renderNote(n,alpha,fade){
   var g=el("g",{transform:"translate("+n.x.toFixed(1)+",0)"});
   if(alpha<1) g.setAttribute("opacity",alpha.toFixed(2));
@@ -515,7 +515,7 @@ function renderNote(n,alpha,fade){
   }
   if(n2.acc){
     var a=el("text",{x:-24,y:p.y,"class":"acc"+(fade?" fade":""),"text-anchor":"middle",
-      "dominant-baseline":"central","font-size":"25"});
+      "dominant-baseline":"central","font-size":staffMobile?"31":"25"});
     a.textContent="\u266F";
     g.appendChild(a);
   }
@@ -524,7 +524,7 @@ function renderNote(n,alpha,fade){
   g.appendChild(head);
 
   /* Persian solfege name next to every note. */
-  var labelY = p.y > 205 ? p.y-24 : p.y+28;
+  var labelY = p.y > (staffMobile?245:205) ? p.y-(staffMobile?31:24) : p.y+(staffMobile?34:28);
   var nameText=el("text",{x:0,y:labelY,"class":"note-name"+(fade?" fade":""),
     "text-anchor":"middle","dominant-baseline":"central"});
   var pc=((n.midi%12)+12)%12;
@@ -1321,6 +1321,8 @@ function updateStatusUI(){
 }
  
 /* ================= boot ================= */
+applyStaffLayout();
+X0=staffMobile?170:200; XMAX=staffMobile?830:960; SPACING=staffMobile?50:54;
 drawBase();
 document.body.classList.add("show-hints");
 buildMap();
@@ -1329,7 +1331,19 @@ refresh();
 updateRecordUI();
 if(volVal) volVal.textContent=vol.value+"%";
 if(document.fonts&&document.fonts.ready) document.fonts.ready.then(fitClefs);
-window.addEventListener("resize",fitClefs);
+window.addEventListener("resize",function(){
+  var next=window.matchMedia("(max-width:760px)").matches;
+  if(next!==staffMobile){
+    applyStaffLayout();
+    X0=staffMobile?170:200; XMAX=staffMobile?830:960; SPACING=staffMobile?50:54;
+    for(var si=0;si<staffNotes.length;si++) staffNotes[si].x=Math.min(X0+si*SPACING,XMAX);
+    drawBase();
+    renderStaff();
+    fitClefs();
+  }else{
+    fitClefs();
+  }
+});
 })();
 </script>
 </body>
